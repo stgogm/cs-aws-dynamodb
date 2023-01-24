@@ -57,26 +57,26 @@ internal class Tables : Logger
     var res = await Client.CreateTableAsync(
       TableName,
       new List<KeySchemaElement>() {
-        new KeySchemaElement() {
+        new KeySchemaElement {
           AttributeName= "user_id",
           KeyType="HASH"
         },
-        new KeySchemaElement() {
+        new KeySchemaElement {
           AttributeName= "timestamp",
           KeyType="RANGE"
         },
       },
       new List<AttributeDefinition>() {
-        new AttributeDefinition() {
+        new AttributeDefinition {
           AttributeName = "user_id",
           AttributeType = "S",
         },
-        new AttributeDefinition() {
+        new AttributeDefinition {
           AttributeName = "timestamp",
           AttributeType = "N",
         },
       },
-      new ProvisionedThroughput()
+      new ProvisionedThroughput
       {
         WriteCapacityUnits = 1,
         ReadCapacityUnits = 1,
@@ -92,7 +92,7 @@ internal class Tables : Logger
   {
     Log.Debug($"Updating table {TableName}...");
 
-    var res = await Client.UpdateTableAsync(TableName, new ProvisionedThroughput()
+    var res = await Client.UpdateTableAsync(TableName, new ProvisionedThroughput
     {
       WriteCapacityUnits = 1,
       ReadCapacityUnits = 1,
