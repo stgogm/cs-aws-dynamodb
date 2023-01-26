@@ -1,6 +1,8 @@
+using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.DynamoDBv2.DataModel;
 using Amazon.DynamoDBv2.Model;
 using Amazon.DynamoDBv2;
+using Xaevik.Cuid;
 
 namespace CsAwsDynamoDB;
 
@@ -12,44 +14,27 @@ internal class Items : Logger
 
   private readonly string TableName;
 
+  private readonly Table NotesTable;
+
   public Items(string tableName)
   {
+    NotesTable = Table.LoadTable(Client, tableName);
     Context = new DynamoDBContext(Client);
+
     TableName = tableName;
   }
 
   public async Task Run()
   {
-    await OpmPut();
     // await Put();
     // await Update();
     // await Delete();
     // await ConditionalPut();
     // await IncrementViews();
+    await Query();
   }
 
   async Task Put()
-  {
-    var Item = new Dictionary<string, AttributeValue> {
-      { "timestamp", new AttributeValue { N = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString() } },
-      { "user_id", new AttributeValue { S = Guid.NewGuid().ToString() } },
-      { "content", new AttributeValue { S = "This is a new content" } },
-      { "title", new AttributeValue { S = "Title" } },
-      { "views", new AttributeValue { N = "0" } }
-    };
-
-    Log.Debug("Inserting item...");
-
-    var res = await Client.PutItemAsync(TableName, Item);
-
-    Log.Debug($"user_id: {Item["user_id"].S}");
-    Log.Debug($"timestamp: {Item["timestamp"].N}");
-    Log.Debug($"content: {Item["content"].S}");
-    Log.Debug($"title: {Item["title"].S}");
-    Log.Debug($"views: {Item["views"].N}");
-  }
-
-  async Task OpmPut()
   {
     Log.Debug("Inserting item using OPM...");
 
@@ -57,7 +42,7 @@ internal class Items : Logger
     {
       content = "This is a new content created with Object Persistence Model",
       timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-      user_id = Guid.NewGuid().ToString(),
+      user_id = new Cuid2(8).ToString(),
       title = "Title",
       views = 0,
     });
@@ -65,85 +50,111 @@ internal class Items : Logger
 
   async Task ConditionalPut()
   {
-    var Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-    var Request = new PutItemRequest()
-    {
-      ConditionExpression = "#t <> :t",
-      TableName = TableName,
-      ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
-        { ":t", new AttributeValue { N = Timestamp } },
-      },
-      ExpressionAttributeNames = new Dictionary<string, string> {
-        { "#t", "timestamp" }
-      },
-      Item = new Dictionary<string, AttributeValue> {
-        { "user_id", new AttributeValue { S = Guid.NewGuid().ToString() } },
-        { "content", new AttributeValue { S = "This is a new content" } },
-        { "timestamp", new AttributeValue { N = Timestamp } },
-        { "title", new AttributeValue { S = "Title" } }
-      },
-    };
-
     Log.Debug("Conditionally putting item...");
 
-    var res = await Client.PutItemAsync(Request);
+    var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+    await NotesTable.PutItemAsync(new Document {
+      { "user_id", new Cuid2(8).ToString() },
+      { "content", "This is a new content" },
+      { "timestamp", timestamp },
+      { "title", "Title" },
+      { "views", 0 },
+    },
+    new PutItemOperationConfig
+    {
+      ConditionalExpression = new Expression
+      {
+        ExpressionStatement = "#t <> :t",
+        ExpressionAttributeValues = {
+          { ":t", timestamp },
+        },
+        ExpressionAttributeNames = {
+          { "#t", "timestamp" }
+        }
+      }
+    });
   }
 
   async Task Update()
   {
-    var Updates = new Dictionary<string, AttributeValueUpdate> {
-      { "content", new AttributeValueUpdate(new AttributeValue { S = "Some useful and interesting content" }, AttributeAction.PUT) },
-      { "title", new AttributeValueUpdate(new AttributeValue { S = "Some title" }, AttributeAction.PUT) }
-    };
-
-    var Key = new Dictionary<string, AttributeValue> {
-      { "user_id", new AttributeValue { S = "bda72c62-2a3e-4725-83a1-04484e172833" } },
-      { "timestamp", new AttributeValue { N = "1674584344" } }
-    };
-
     Log.Debug("Updating item...");
 
-    var res = await Client.UpdateItemAsync(TableName, Key, Updates);
-
-    Log.Debug($"user_id: {res.Attributes["user_id"].S}");
-    Log.Debug($"timestamp: {res.Attributes["timestamp"].N}");
-    Log.Debug($"content: {res.Attributes["content"].S}");
-    Log.Debug($"title: {res.Attributes["title"].S}");
-    Log.Debug($"views: {res.Attributes["views"].N}");
+    await Context.SaveAsync(new Note
+    {
+      // Key
+      user_id = "bda72c62-2a3e-4725-83a1-04484e172833",
+      timestamp = 1674584344,
+      // Updates
+      content = "Some useful and interesting content from OPM",
+      title = "Some title",
+    });
   }
 
   async Task IncrementViews()
   {
-    var Request = new UpdateItemRequest()
-    {
-      UpdateExpression = "set #views = #views + :inc",
-      TableName = TableName,
-      ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
-        { ":inc", new AttributeValue { N = "1" } }
-      },
-      ExpressionAttributeNames = new Dictionary<string, string> {
-        { "#views", "views" }
-      },
-      Key = new Dictionary<string, AttributeValue> {
-        { "user_id", new AttributeValue { S = "e8e7f21e-4519-43b3-bea1-d4e966cb3544" } },
-        { "timestamp", new AttributeValue { N = "1674586925" } }
-      },
-    };
+    // var Request = new UpdateItemRequest()
+    // {
+    //   UpdateExpression = "ADD #v :i",
+    //   TableName = TableName,
+    //   ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
+    //     { ":i", new AttributeValue { N = "1" } }
+    //   },
+    //   ExpressionAttributeNames = new Dictionary<string, string> {
+    //     { "#v", "views" }
+    //   },
+    //   Key = new Dictionary<string, AttributeValue> {
+    //     { "user_id", new AttributeValue { S = "kk3y6fqc" } },
+    //     { "timestamp", new AttributeValue { N = "1674674868" } }
+    //   },
+    // };
 
     Log.Debug("Increment views...");
 
-    var res = await Client.UpdateItemAsync(Request);
+    // var res = await Client.UpdateItemAsync(Request);
+
+    // TODO: Looks like there's a bug on the SDK here...
+    // https://github.com/aws/aws-sdk-net/issues/2528
+    var doc = new Document {
+      { "user_id", "kk3y6fqc" },
+      { "timestamp", 1674674868 },
+    };
+
+    var config = new UpdateItemOperationConfig
+    {
+      ReturnValues = ReturnValues.AllNewAttributes,
+      ConditionalExpression = new Expression
+      {
+        ExpressionStatement = "ADD #v :i",
+        ExpressionAttributeNames = {
+          { "#v", "views" },
+        },
+        ExpressionAttributeValues = {
+          { ":i", 1 },
+        },
+      },
+    };
+
+    await NotesTable.UpdateItemAsync(doc, config);
+  }
+
+  async Task Query()
+  {
+    var hashKey = new Primitive("kk3y6fqc");
+    var filter = new QueryFilter("timestamp", QueryOperator.GreaterThanOrEqual, 1674674868);
+    var search = NotesTable.Query(hashKey, filter);
+    var res = search.GetNextSetAsync();
+
+    System.Console.WriteLine(res.Result.ToJsonPretty());
   }
 
   async Task Delete()
   {
-    var Key = new Dictionary<string, AttributeValue> {
-      { "user_id", new AttributeValue { S = "bda72c62-2a3e-4725-83a1-04484e172833" } },
-      { "timestamp", new AttributeValue { N = "1674584344" } }
-    };
-
     Log.Debug("Deleting item...");
 
-    var res = await Client.DeleteItemAsync(TableName, Key);
+    await NotesTable.DeleteItemAsync(new Document {
+      { "user_id", "bda72c62-2a3e-4725-83a1-04484e172833" },
+      { "timestamp", "1674584344" },
+    });
   }
 }

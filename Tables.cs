@@ -56,7 +56,7 @@ internal class Tables : Logger
 
     var res = await Client.CreateTableAsync(
       TableName,
-      new List<KeySchemaElement>() {
+      new List<KeySchemaElement> {
         new KeySchemaElement {
           AttributeName= "user_id",
           KeyType="HASH"
@@ -66,7 +66,7 @@ internal class Tables : Logger
           KeyType="RANGE"
         },
       },
-      new List<AttributeDefinition>() {
+      new List<AttributeDefinition> {
         new AttributeDefinition {
           AttributeName = "user_id",
           AttributeType = "S",
