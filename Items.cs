@@ -30,8 +30,8 @@ internal class Items : Logger
     // await Update();
     // await Delete();
     // await ConditionalPut();
-    // await IncrementViews();
-    await Query();
+    await IncrementViews();
+    // await Query();
   }
 
   async Task Put()
@@ -93,49 +93,25 @@ internal class Items : Logger
 
   async Task IncrementViews()
   {
-    // var Request = new UpdateItemRequest()
-    // {
-    //   UpdateExpression = "ADD #v :i",
-    //   TableName = TableName,
-    //   ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
-    //     { ":i", new AttributeValue { N = "1" } }
-    //   },
-    //   ExpressionAttributeNames = new Dictionary<string, string> {
-    //     { "#v", "views" }
-    //   },
-    //   Key = new Dictionary<string, AttributeValue> {
-    //     { "user_id", new AttributeValue { S = "kk3y6fqc" } },
-    //     { "timestamp", new AttributeValue { N = "1674674868" } }
-    //   },
-    // };
-
-    Log.Debug("Increment views...");
-
-    // var res = await Client.UpdateItemAsync(Request);
-
-    // TODO: Looks like there's a bug on the SDK here...
-    // https://github.com/aws/aws-sdk-net/issues/2528
-    var doc = new Document {
-      { "user_id", "kk3y6fqc" },
-      { "timestamp", 1674674868 },
-    };
-
-    var config = new UpdateItemOperationConfig
+    var Request = new UpdateItemRequest()
     {
-      ReturnValues = ReturnValues.AllNewAttributes,
-      ConditionalExpression = new Expression
-      {
-        ExpressionStatement = "ADD #v :i",
-        ExpressionAttributeNames = {
-          { "#v", "views" },
-        },
-        ExpressionAttributeValues = {
-          { ":i", 1 },
-        },
+      UpdateExpression = "ADD #v :i",
+      TableName = TableName,
+      ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
+        { ":i", new AttributeValue { N = "1" } }
+      },
+      ExpressionAttributeNames = new Dictionary<string, string> {
+        { "#v", "views" }
+      },
+      Key = new Dictionary<string, AttributeValue> {
+        { "user_id", new AttributeValue { S = "kk3y6fqc" } },
+        { "timestamp", new AttributeValue { N = "1674674868" } }
       },
     };
 
-    await NotesTable.UpdateItemAsync(doc, config);
+    Log.Debug("Incrementing views...");
+
+    var res = await Client.UpdateItemAsync(Request);
   }
 
   async Task Query()
